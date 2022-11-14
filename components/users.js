@@ -414,43 +414,95 @@ SteamCommunity.prototype.getUserInventoryContexts = function(userID, callback) {
 
 /**
  * Get the contents of a user's inventory context.
- * @deprecated Use getUserInventoryContents instead
+ * @param {string} apiKey - The steamapis apikey
  * @param {SteamID|string} userID - The user's SteamID as a SteamID object or a string which can parse into one
  * @param {int} appID - The Steam application ID of the game for which you want an inventory
  * @param {int} contextID - The ID of the "context" within the game you want to retrieve
  * @param {boolean} tradableOnly - true to get only tradable items and currencies
+ * @param {string} [language] - The language of item descriptions to return. Omit for default (which may either be English or your account's chosen language)
  * @param {function} callback
  */
-SteamCommunity.prototype.getUserInventory = function(userID, appID, contextID, tradableOnly, callback) {
+ SteamCommunity.prototype.getUserInventory = function(apiKey, userID, appID, contextID, tradableOnly, language, callback) {
+	if (typeof language === 'function') {
+		callback = language;
+		language = "english";
+	}
+
+	if (!userID) {
+		callback(new Error("The user's SteamID is invalid or missing."));
+		return;
+	}
+
+	if (!apiKey) {
+		callback(new Error("The apiKey is missing."));
+		return;
+	}
+
 	var self = this;
 
 	if (typeof userID === 'string') {
 		userID = new SteamID(userID);
 	}
 
-	var endpoint = "/profiles/" + userID.getSteamID64();
+	var pos = 1;
 	get([], []);
 
-	function get(inventory, currency, start) {
+	function get(inventory, currency, start, retries = 5) {
 		self.httpRequest({
-			"uri": "https://steamcommunity.com" + endpoint + "/inventory/json/" + appID + "/" + contextID,
-			"headers": {
-				"Referer": "https://steamcommunity.com" + endpoint + "/inventory"
-			},
+			"uri": `https://api.steamapis.com/steam/inventory/${userID.getSteamID64()}/${appID}/${contextID}`,
 			"qs": {
-				"start": start,
-				"trading": tradableOnly ? 1 : undefined
+				"api_key": apiKey,
+				"l": language,
+				"count": 2000, // Max items per 'page'
+				"start_assetid": start
 			},
 			"json": true
 		}, function(err, response, body) {
 			if (err) {
+				if(err.message == "HTTP error 404" || body.error == "Could not retrieve user inventory. Please try again later.") {
+					if(retries > 0) {
+						get(inventory, currency, start, retries - 1)
+						return
+					}
+				}
+
+				if (err.message == "HTTP error 403" && body === null) {
+					// 403 with a body of "null" means the inventory/profile is private.
+					if (self.steamID && userID.getSteamID64() == self.steamID.getSteamID64()) {
+						// We can never get private profile error for our own inventory!
+						self._notifySessionExpired(err);
+					}
+
+					callback(new Error("This profile is private."));
+					return;
+				}
+
+				if (err.message == "HTTP error 500" && body && body.error) {
+					err = new Error(body.error);
+
+					var match = body.error.match(/^(.+) \((\d+)\)$/);
+					if (match) {
+						err.message = match[1];
+						err.eresult = match[2];
+						callback(err);
+						return;
+					}
+				}
+
 				callback(err);
 				return;
 			}
 
-			if (!body || !body.success || !body.rgInventory || !body.rgDescriptions || !body.rgCurrency) {
+			if (body && body.success && body.total_inventory_count === 0) {
+				// Empty inventory
+				callback(null, [], [], 0);
+				return;
+			}
+
+			if (!body || !body.success || !body.assets || !body.descriptions) {
 				if (body) {
-					callback(new Error(body.Error || "Malformed response"));
+					// Dunno if the error/Error property even exists on this new endpoint
+					callback(new Error(body.error || body.Error || "Malformed response"));
 				} else {
 					callback(new Error("Malformed response"));
 				}
@@ -458,34 +510,38 @@ SteamCommunity.prototype.getUserInventory = function(userID, appID, contextID, t
 				return;
 			}
 
-			var i;
-			for (i in body.rgInventory) {
-				if (!body.rgInventory.hasOwnProperty(i)) {
-					continue;
-				}
+			for (var i = 0; i < body.assets.length; i++) {
+				var description = getDescription(body.descriptions, body.assets[i].classid, body.assets[i].instanceid);
 
-				inventory.push(new CEconItem(body.rgInventory[i], body.rgDescriptions, contextID));
+				if (!tradableOnly || (description && description.tradable)) {
+					body.assets[i].pos = pos++;
+					(body.assets[i].currencyid ? currency : inventory).push(new CEconItem(body.assets[i], description, contextID));
+				}
 			}
 
-			for (i in body.rgCurrency) {
-				if (!body.rgCurrency.hasOwnProperty(i)) {
-					continue;
-				}
-
-				currency.push(new CEconItem(body.rgInventory[i], body.rgDescriptions, contextID));
-			}
-
-			if (body.more) {
-				var match = response.request.uri.href.match(/\/(profiles|id)\/([^\/]+)\//);
-				if(match) {
-					endpoint = "/" + match[1] + "/" + match[2];
-				}
-
-				get(inventory, currency, body.more_start);
+			if (body.more_items) {
+				get(inventory, currency, body.last_assetid);
 			} else {
-				callback(null, inventory, currency);
+				callback(null, inventory, currency, body.total_inventory_count);
 			}
 		}, "steamcommunity");
+	}
+
+	// A bit of optimization; objects are hash tables so it's more efficient to look up by key than to iterate an array
+	var quickDescriptionLookup = {};
+
+	function getDescription(descriptions, classID, instanceID) {
+		var key = classID + '_' + (instanceID || '0'); // instanceID can be undefined, in which case it's 0.
+
+		if (quickDescriptionLookup[key]) {
+			return quickDescriptionLookup[key];
+		}
+
+		for (var i = 0; i < descriptions.length; i++) {
+			quickDescriptionLookup[descriptions[i].classid + '_' + (descriptions[i].instanceid || '0')] = descriptions[i];
+		}
+
+		return quickDescriptionLookup[key];
 	}
 };
 
@@ -498,7 +554,7 @@ SteamCommunity.prototype.getUserInventory = function(userID, appID, contextID, t
  * @param {string} [language] - The language of item descriptions to return. Omit for default (which may either be English or your account's chosen language)
  * @param {function} callback
  */
-SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, contextID, tradableOnly, language, callback) {
+ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, contextID, tradableOnly, language, callback) {
 	if (typeof language === 'function') {
 		callback = language;
 		language = "english";
