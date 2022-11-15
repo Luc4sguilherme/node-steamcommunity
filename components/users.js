@@ -459,7 +459,7 @@ SteamCommunity.prototype.getUserInventoryContexts = function(userID, callback) {
 			"json": true
 		}, function(err, response, body) {
 			if (err) {
-				if(err.message == "HTTP error 404" || body.error == "Could not retrieve user inventory. Please try again later.") {
+				if(err.message == "HTTP error 404" || body && body.error == "Could not retrieve user inventory. Please try again later.") {
 					if(retries > 0) {
 						get(inventory, currency, start, retries - 1)
 						return
