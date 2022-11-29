@@ -843,6 +843,144 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 };
 
 /**
+ * Get the contents of a user's inventory context.
+ * @param {string} apiKey - The steamsupply apikey
+ * @param {SteamID|string} userID - The user's SteamID as a SteamID object or a string which can parse into one
+ * @param {int} appID - The Steam application ID of the game for which you want an inventory
+ * @param {int} contextID - The ID of the "context" within the game you want to retrieve
+ * @param {boolean} tradableOnly - true to get only tradable items and currencies
+ * @param {string} [language] - The language of item descriptions to return. Omit for default (which may either be English or your account's chosen language)
+ * @param {function} callback
+ */
+ SteamCommunity.prototype.getUserInventorySteamSupply = function(apiKey, userID, appID, contextID, tradableOnly, language, callback) {
+	if (typeof language === 'function') {
+		callback = language;
+		language = "english";
+	}
+
+	if (!userID) {
+		callback(new Error("The user's SteamID is invalid or missing."));
+		return;
+	}
+
+	if (!apiKey) {
+		callback(new Error("The apiKey is missing."));
+		return;
+	}
+
+	var self = this;
+
+	if (typeof userID === 'string') {
+		userID = new SteamID(userID);
+	}
+
+	var pos = 1;
+	get([], []);
+
+	function get(inventory, currency, start, retries = 5) {
+		self.httpRequest({
+			"uri": `https://steam.supply/API/${apiKey}/proxyload`,
+			"qs": {
+				"l": language,
+				"steamid": userID.getSteamID64(),
+				"appid": appID,
+				"contextid": contextID,
+				"count": 5000, // Max items per 'page'
+				"start_assetid": start
+			},
+			"json": true
+		}, function(err, response, body) {
+			if (err) {
+				if(err.message == "HTTP error 500") {
+					if(retries > 0) {
+						get(inventory, currency, start, retries - 1)
+						return
+					}
+				}
+
+				if(err.message == "HTTP error 403") {
+					if(response.body && response.body.includes('Invalid API key')) {
+						callback(new Error("Invalid API key"));
+						return;
+					}
+
+
+					if(response.body && response.body.includes('Inventory Private')  ) {
+						callback(new Error("This profile is private."));
+						return;
+					}
+				}
+
+
+				if(response && response.body) {
+					callback(new Error(response.body))
+					return;
+				}
+
+				callback(err);
+				return;
+			}
+
+			if(typeof response.body != 'object') {
+				if(retries > 0) {
+					get(inventory, currency, start, retries - 1)
+					return
+				}
+			}
+
+			if (body && body.success && body.total_inventory_count === 0) {
+				// Empty inventory
+				callback(null, [], [], 0);
+				return;
+			}
+
+			if (!body || !body.success || !body.assets || !body.descriptions) {
+				if (body) {
+					// Dunno if the error/Error property even exists on this new endpoint
+					callback(new Error(body.error || body.Error || "Malformed response"));
+				} else {
+					callback(new Error("Malformed response"));
+				}
+
+				return;
+			}
+
+			for (var i = 0; i < body.assets.length; i++) {
+				var description = getDescription(body.descriptions, body.assets[i].classid, body.assets[i].instanceid);
+
+				if (!tradableOnly || (description && description.tradable)) {
+					body.assets[i].pos = pos++;
+					(body.assets[i].currencyid ? currency : inventory).push(new CEconItem(body.assets[i], description, contextID));
+				}
+			}
+
+			if (body.more_items) {
+				get(inventory, currency, body.last_assetid);
+			} else {
+				callback(null, inventory, currency, body.total_inventory_count);
+			}
+		}, "steamcommunity");
+	}
+
+	// A bit of optimization; objects are hash tables so it's more efficient to look up by key than to iterate an array
+	var quickDescriptionLookup = {};
+
+	function getDescription(descriptions, classID, instanceID) {
+		var key = classID + '_' + (instanceID || '0'); // instanceID can be undefined, in which case it's 0.
+
+		if (quickDescriptionLookup[key]) {
+			return quickDescriptionLookup[key];
+		}
+
+		for (var i = 0; i < descriptions.length; i++) {
+			quickDescriptionLookup[descriptions[i].classid + '_' + (descriptions[i].instanceid || '0')] = descriptions[i];
+		}
+
+		return quickDescriptionLookup[key];
+	}
+};
+
+/**
  * Upload an image to Steam and send it to another user over Steam chat.
  * @param {SteamID|string} userID - Either a SteamID object or a string that can parse into one
  * @param {Buffer} imageContentsBuffer - The image contents, as a Buffer
