@@ -662,7 +662,7 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 		}, function(err, response, body) {
 			if (err) {
 				if(response.statusCode == 403) {
-					callback('Invalid API key');
+					callback(new Error("Invalid API key"));
 					return;
 				}
 
