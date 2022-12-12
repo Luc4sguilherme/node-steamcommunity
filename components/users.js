@@ -612,7 +612,7 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 };
 
 /**
- * Get the contents of a user's inventory context.
+ * Get the contents of a user's inventory with steam.supply.
  * @param {string} apiKey - The steamsupply apikey
  * @param {SteamID|string} userID - The user's SteamID as a SteamID object or a string which can parse into one
  * @param {int} appID - The Steam application ID of the game for which you want an inventory
@@ -621,7 +621,7 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
  * @param {string} [language] - The language of item descriptions to return. Omit for default (which may either be English or your account's chosen language)
  * @param {function} callback
  */
- SteamCommunity.prototype.getUserInventorySteamSupply = function(apiKey, userID, appID, contextID, tradableOnly, language, callback) {
+ SteamCommunity.prototype.getUserInventoryWithSteamSupply = function(apiKey, userID, appID, contextID, tradableOnly, language, callback) {
 	if (typeof language === 'function') {
 		callback = language;
 		language = "english";
