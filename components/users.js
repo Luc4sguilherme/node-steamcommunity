@@ -648,7 +648,7 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 
 	function get(inventory, currency, start, retries = 5) {
 		self.httpRequest({
-			"uri": `https://steam.supply/API/${apiKey}/proxyload`,
+			"uri": `https://steam.supply/API/${apiKey}/loadinventory`,
 			"qs": {
 				"l": language,
 				"steamid": userID.getSteamID64(),
@@ -681,7 +681,7 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 				}
 
 
-				if(response.body) {
+				if(response && response.body) {
 					callback(new Error(response.body))
 					return;
 				}
@@ -690,7 +690,7 @@ SteamCommunity.prototype.getUserInventoryContents = function(userID, appID, cont
 				return;
 			}
 
-			if(typeof response.body != 'object') {
+			if(typeof response.body != 'object' || response.body.fake_redirect) {
 				if(retries > 0) {
 					get(inventory, currency, start, retries - 1)
 					return
