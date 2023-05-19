@@ -1134,3 +1134,33 @@ SteamCommunity.prototype.sendImageToUser = function(userID, imageContentsBuffer,
 		}, 'steamcommunity');
 	}, 'steamcommunity');
 };
+
+SteamCommunity.prototype.getCommentPrivacy = function(userID, callback) {
+	if (typeof userID === 'undefined') {
+		throw new Error('ID64 is undefined');
+	}
+
+	if (typeof userID === 'string') {
+		userID = new SteamID(userID);
+	}
+
+	this.httpRequest({
+		uri: "https://steamcommunity.com/profiles/" + userID.toString(),
+	},
+	(err, _response, body) => {
+		if (err) {
+			callback(err);
+		}
+
+		const $ = Cheerio.load(body);
+		const profileCommentArea = $('.profile_comment_area')
+
+		if(!profileCommentArea) {
+			callback(new Error("Malformed response"));
+		}
+
+		const commentPrivacy = profileCommentArea.children().length > 0 ? 'Public' : 'Private';
+
+		callback(null, commentPrivacy);
+	}, "steamcommunity");
+}
