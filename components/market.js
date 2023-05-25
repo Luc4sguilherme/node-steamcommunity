@@ -174,6 +174,44 @@ SteamCommunity.prototype.createSellOrder = function(appId, assetId, contextId, p
 	}, "steamcommunity");
 };
 
+SteamCommunity.prototype.buyOrderStatus = function(appId, marketHashName, buyOrderId, callback) {
+	const self = this
+	this.httpRequest({
+		uri: 'https://steamcommunity.com/market/getbuyorderstatus',
+		method: 'GET',
+		qs: {
+			sessionid: self.getSessionID(),
+			buy_orderid: buyOrderId
+		},
+		headers: {
+			Referer: `https://steamcommunity.com/market/listings/${appId}/${encodeURIComponent(marketHashName)}`,
+			'X-Requested-With': 'XMLHttpRequest'
+		},
+		json: true
+	},function (err, response, body) {
+		if (err) {
+			callback(err);
+			return;
+		}
+
+		if (body.success && body.success != SteamCommunity.EResult.OK) {
+			let err = new Error(body.message || SteamCommunity.EResult[body.success]);
+			err.eresult = err.code = body.success;
+			callback(err);
+			return;
+		}
+
+        callback(null, {
+			success: Boolean(body.success),
+            active: Boolean(body.active),
+            purchased: body.purchased,
+            quantity: body.quantity,
+            quantityRemaining: body.quantity_remaining,
+            purchases: body.purchases
+        });
+	}, "steamcommunity");
+};
+
 /**
  * Check if an item is eligible to be turned into gems and if so, get its gem value
  * @param {int} appid
