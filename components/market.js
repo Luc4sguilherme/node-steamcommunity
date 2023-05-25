@@ -1,6 +1,8 @@
 const SteamCommunity = require('../index.js');
 const Cheerio = require('cheerio');
 
+const ECurrencyCode = require('../resources/ECurrencyCode.js');
+
 const Helpers = require('./helpers.js');
 
 /**
@@ -51,6 +53,43 @@ SteamCommunity.prototype.getWalletBalance = function(callback) {
 	}, "steamcommunity");
 };
 
+SteamCommunity.prototype.priceOverview = function(appId, marketHashName, currency, callback) {
+	const self = this
+	this.httpRequest({
+		uri: 'https://steamcommunity.com/market/priceoverview',
+		method: 'GET',
+		qs: {
+			appid: appId,
+			currency: ECurrencyCode[currency],
+			market_hash_name: marketHashName
+		},
+		headers: {
+			Referer: `https://steamcommunity.com/id/${self.steamID.getSteamID64()}/inventory?modal=1&market=1`,
+			'X-Prototype-Version': '1.7',
+			'X-Requested-With': 'XMLHttpRequest'
+		},
+		json: true
+	},function (err, response, body) {
+		if (err) {
+			callback(err);
+			return;
+		}
+
+		if (body.success && body.success != SteamCommunity.EResult.OK) {
+			let err = new Error(body.message || SteamCommunity.EResult[body.success]);
+			err.eresult = err.code = body.success;
+			callback(err);
+			return;
+		}
+
+        callback(null, {
+            success: body.success,
+            lowestPrice: body.lowest_price,
+            volume: Number(body.volume.split(',').join('')),
+            medianPrice: body.median_price
+        });
+	}, "steamcommunity");
+};
 
 /**
  * Check if an item is eligible to be turned into gems and if so, get its gem value
