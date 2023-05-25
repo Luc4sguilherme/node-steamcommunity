@@ -32,6 +32,26 @@ SteamCommunity.prototype.getMarketApps = function(callback) {
 	}, "steamcommunity");
 };
 
+SteamCommunity.prototype.getWalletBalance = function(callback) {
+	this.httpRequest('https://steamcommunity.com/market/', function (err, response, body) {
+		if (err) {
+			callback(err);
+			return;
+		}
+
+		const $ = Cheerio.load(body);
+
+		if ($('#marketWalletBalanceAmount')) {
+			const balance = $('#marketWalletBalanceAmount').text()
+
+			callback(null, balance);
+		} else {
+			callback(new Error("Malformed response"));
+		}
+	}, "steamcommunity");
+};
+
+
 /**
  * Check if an item is eligible to be turned into gems and if so, get its gem value
  * @param {int} appid
