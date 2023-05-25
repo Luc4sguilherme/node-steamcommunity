@@ -91,6 +91,47 @@ SteamCommunity.prototype.priceOverview = function(appId, marketHashName, currenc
 	}, "steamcommunity");
 };
 
+SteamCommunity.prototype.createBuyOrder = function(appId, price, amount, marketHashName, currency, callback) {
+	const self = this
+	this.httpRequest({
+		uri: 'https://steamcommunity.com/market/createbuyorder',
+		method: 'POST',
+		headers: {
+			Referer: `https://steamcommunity.com/market/listings/${appId}/${encodeURIComponent(marketHashName)}`,
+			Origin: 'https://steamcommunity.com',
+			'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+		},
+		form: {
+			sessionid: self.getSessionID(),
+			currency: ECurrencyCode[currency],
+            appid: appId,
+            market_hash_name: marketHashName,
+            price_total: Number((price * amount) * 100).toFixed(2),
+            quantity: amount,
+            billing_state: '',
+            save_my_address: '0'
+		},
+		json: true
+	},function (err, response, body) {
+		if (err) {
+			callback(err);
+			return;
+		}
+
+		if (body.success && body.success != SteamCommunity.EResult.OK) {
+			let err = new Error(body.message || SteamCommunity.EResult[body.success]);
+			err.eresult = err.code = body.success;
+			callback(err);
+			return;
+		}
+
+        callback(null, {
+            success: Boolean(body.success),
+            buyOrderId: Number(body.buy_orderid)
+        });
+	}, "steamcommunity");
+};
+
 /**
  * Check if an item is eligible to be turned into gems and if so, get its gem value
  * @param {int} appid
