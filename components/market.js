@@ -132,6 +132,48 @@ SteamCommunity.prototype.createBuyOrder = function(appId, price, amount, marketH
 	}, "steamcommunity");
 };
 
+SteamCommunity.prototype.createSellOrder = function(appId, assetId, contextId, price, amount, callback) {
+	const self = this
+	this.httpRequest({
+		uri: 'https://steamcommunity.com/market/sellitem',
+		method: 'POST',
+		headers: {
+			Referer: `https://steamcommunity.com/id/${self.steamID.getSteamID64()}/inventory?modal=1&market=1`,
+			Origin: 'https://steamcommunity.com',
+			'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+		},
+		form: {
+			sessionid: self.getSessionID(),
+            appid: appId,
+            contextid: contextId,
+            assetid: assetId,
+            amount,
+            price: Number((price * 100).toFixed(2))
+		},
+		json: true
+	},function (err, response, body) {
+		if (err) {
+			callback(err);
+			return;
+		}
+
+		if (body.success && body.success != SteamCommunity.EResult.OK) {
+			let err = new Error(body.message || SteamCommunity.EResult[body.success]);
+			err.eresult = err.code = body.success;
+			callback(err);
+			return;
+		}
+
+        callback(null, {
+			success: body.success,
+            requiresConfirmation: Boolean(body.requires_confirmation),
+            needsMobileConfirmation: body.needs_mobile_confirmation,
+            needsEmailConfirmation: body.needs_email_confirmation,
+            emailDomain: body.email_domain
+        });
+	}, "steamcommunity");
+};
+
 /**
  * Check if an item is eligible to be turned into gems and if so, get its gem value
  * @param {int} appid
