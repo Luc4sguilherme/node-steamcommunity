@@ -1,8 +1,6 @@
 const SteamCommunity = require('../index.js');
 const Cheerio = require('cheerio');
 
-const ECurrencyCode = require('../resources/ECurrencyCode.js');
-
 const Helpers = require('./helpers.js');
 
 /**
@@ -60,7 +58,7 @@ SteamCommunity.prototype.priceOverview = function(appId, marketHashName, currenc
 		method: 'GET',
 		qs: {
 			appid: appId,
-			currency: ECurrencyCode[currency],
+			currency,
 			market_hash_name: marketHashName
 		},
 		headers: {
@@ -103,7 +101,7 @@ SteamCommunity.prototype.createBuyOrder = function(appId, price, amount, marketH
 		},
 		form: {
 			sessionid: self.getSessionID(),
-			currency: ECurrencyCode[currency],
+			currency,
             appid: appId,
             market_hash_name: marketHashName,
             price_total: Number((price * amount) * 100).toFixed(2),
