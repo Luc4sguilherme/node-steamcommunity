@@ -277,6 +277,58 @@ SteamCommunity.prototype.cancelSellOrder = function(listingId, callback) {
 	}, "steamcommunity");
 };
 
+SteamCommunity.prototype.getMyListings = function(start = 0, count = 100, callback) {
+	this.httpRequest({
+		uri: 'https://steamcommunity.com/market/mylistings',
+		method: 'GET',
+		qs: {
+			start,
+			count,
+			norender: '1'
+		},
+		headers: {
+			Referer: 'https://steamcommunity.com/market',
+			'X-Prototype-Version': '1.7',
+			'X-Requested-With': 'XMLHttpRequest'
+		},
+		json: true
+	},function (err, response, body) {
+		if (err) {
+			callback(err);
+			return;
+		}
+
+		if (body.success && body.success != SteamCommunity.EResult.OK) {
+			let err = new Error(body.message || SteamCommunity.EResult[body.success]);
+			err.eresult = err.code = body.success;
+			callback(err);
+			return;
+		}
+
+        callback(null, {
+			success: body.success,
+			pageSize: body.pagesize,
+			totalCount: body.total_count,
+			assets: body.assets,
+			start: body.start,
+			numActiveListings: body.num_active_listings,
+			listings: body.listings,
+			listingsOnHold: body.listings_on_hold,
+			listingsToConfirm: body.listings_to_confirm,
+			buyOrders: body.buy_orders.map((buyOrder) => ({
+			  appId: buyOrder.appid,
+			  hashName: buyOrder.hash_name,
+			  walletCurrency: buyOrder.wallet_currency,
+			  price: Number(buyOrder.price),
+			  quantity: Number(buyOrder.quantity),
+			  quantityRemaining: Number(buyOrder.quantity_remaining),
+			  buyOrderId: Number(buyOrder.buy_orderid),
+			  description: buyOrder.description
+			}))
+		  });
+	}, "steamcommunity");
+};
+
 /**
  * Check if an item is eligible to be turned into gems and if so, get its gem value
  * @param {int} appid
