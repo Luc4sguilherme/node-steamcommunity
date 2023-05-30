@@ -83,7 +83,7 @@ SteamCommunity.prototype.priceOverview = function(appId, marketHashName, currenc
         callback(null, {
             success: body.success,
             lowestPrice: body.lowest_price,
-            volume: Number(body.volume.split(',').join('')),
+            volume: Number(body.volume?.split(',').join('') || 0),
             medianPrice: body.median_price
         });
 	}, "steamcommunity");
