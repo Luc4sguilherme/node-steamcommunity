@@ -136,7 +136,29 @@ CMarketItem.prototype.updatePriceForCommodity = function(currency, callback) {
 		self.lowestPrice = parseInt(body.lowest_sell_order, 10);
 		self.highestBuyOrder = parseInt(body.highest_buy_order, 10);
 
-		// TODO: The tables?
+		function parseTable(html) {
+			var $ = Cheerio.load(html);
+			var rows = $("tr");
+
+			var orders = [];
+			for(var i = 1; i < rows.length; i++) {
+				var row = $(rows[i]);
+				var cells = row.children("td");
+
+				var order = {
+					"price": Number($(cells[0]).text().replace(",", ".").replace(/[^\d.]/g, ''), 10),
+					"quantity": Number($(cells[1]).text().replace(/,/g, "").replace(/[^\d]/g, ''), 10)
+				};
+
+				orders.push(order);
+			}
+
+			return orders;
+		}
+
+		self.sellOrders = parseTable(body.sell_order_table);
+		self.buyOrders = parseTable(body.buy_order_table);
+
 		if(callback) {
 			callback(null);
 		}
