@@ -981,6 +981,131 @@ SteamCommunity.prototype.getUserInventorySteamSupply = function(apiKey, userID, 
 };
 
 /**
+ * Get the contents of a user's inventory context.
+ * @param {string} apiKey - The luc4s's service apikey
+ * @param {SteamID|string} userID - The user's SteamID as a SteamID object or a string which can parse into one
+ * @param {int} appID - The Steam application ID of the game for which you want an inventory
+ * @param {int} contextID - The ID of the "context" within the game you want to retrieve
+ * @param {boolean} tradableOnly - true to get only tradable items and currencies
+ * @param {string} [language] - The language of item descriptions to return. Omit for default (which may either be English or your account's chosen language)
+ * @param {function} callback
+ */
+SteamCommunity.prototype.getUserInventoryUltimate = function(apiKey, userID, appID, contextID, tradableOnly, language, callback) {
+	if (typeof language === 'function') {
+		callback = language;
+		language = "english";
+	}
+
+	if (!userID) {
+		callback(new Error("The user's SteamID is invalid or missing."));
+		return;
+	}
+
+	if (!apiKey) {
+		callback(new Error("The apiKey is missing."));
+		return;
+	}
+
+	var self = this;
+
+	if (typeof userID === 'string') {
+		userID = new SteamID(userID);
+	}
+
+	var pos = 1;
+	get([], []);
+
+	function get(inventory, currency, start, retries = 25) {
+		self.httpRequest({
+			"uri": `https://jjnh6x2hg8.execute-api.us-east-1.amazonaws.com/v1/inventory/${userID.getSteamID64()}/${appID}/${contextID}`,
+			"qs": {
+				"l": language,
+				"count": 5000,
+				"start_assetid": start
+			},
+			"headers": {
+				"x-api-key": apiKey
+			},
+			"json": true
+		}, function(err, response, body) {
+			if (err) {
+				if(response.statusCode == 429 && body == null || body && body.error == "Could not retrieve user inventory. Please try again later.") {
+					if(retries > 0) {
+						get(inventory, currency, start, retries - 1)
+						return
+					}
+				}
+
+				if(body.message == "Forbidden") {
+					callback(new Error("Forbidden"));
+					return;
+				}
+
+				if(err.message == "HTTP error 403") {
+					callback(new Error("This profile is private."));
+					return;
+				}
+
+				if(body && body.error) {
+					callback(new Error(body.error))
+					return;
+				}
+
+				callback(err);
+				return;
+			}
+
+			if (body && body.success && body.total_inventory_count === 0) {
+				callback(null, [], [], 0);
+				return;
+			}
+
+			if (!body || !body.success || !body.assets || !body.descriptions) {
+				if (body) {
+					callback(new Error(body.error || body.Error || "Malformed response"));
+				} else {
+					callback(new Error("Malformed response"));
+				}
+
+				return;
+			}
+
+			for (var i = 0; i < body.assets.length; i++) {
+				var description = getDescription(body.descriptions, body.assets[i].classid, body.assets[i].instanceid);
+
+				if (!tradableOnly || (description && description.tradable)) {
+					body.assets[i].pos = pos++;
+					(body.assets[i].currencyid ? currency : inventory).push(new CEconItem(body.assets[i], description, contextID));
+				}
+			}
+
+			if (body.more_items) {
+				get(inventory, currency, body.last_assetid);
+			} else {
+				callback(null, inventory, currency, body.total_inventory_count);
+			}
+		}, "steamcommunity");
+	}
+
+	// A bit of optimization; objects are hash tables so it's more efficient to look up by key than to iterate an array
+	var quickDescriptionLookup = {};
+
+	function getDescription(descriptions, classID, instanceID) {
+		var key = classID + '_' + (instanceID || '0'); // instanceID can be undefined, in which case it's 0.
+
+		if (quickDescriptionLookup[key]) {
+			return quickDescriptionLookup[key];
+		}
+
+		for (var i = 0; i < descriptions.length; i++) {
+			quickDescriptionLookup[descriptions[i].classid + '_' + (descriptions[i].instanceid || '0')] = descriptions[i];
+		}
+
+		return quickDescriptionLookup[key];
+	}
+};
+
+/**
  * Upload an image to Steam and send it to another user over Steam chat.
  * @param {SteamID|string} userID - Either a SteamID object or a string that can parse into one
  * @param {Buffer} imageContentsBuffer - The image contents, as a Buffer
