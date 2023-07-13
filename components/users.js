@@ -1036,7 +1036,7 @@ SteamCommunity.prototype.getUserInventoryUltimate = function(apiKey, userID, app
 					}
 				}
 
-				if(body.message == "Forbidden") {
+				if(body && body.message == "Forbidden") {
 					callback(new Error("Forbidden"));
 					return;
 				}
