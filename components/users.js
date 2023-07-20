@@ -1017,14 +1017,15 @@ SteamCommunity.prototype.getUserInventoryUltimate = function(apiKey, userID, app
 
 	function get(inventory, currency, start, retries = 25) {
 		self.httpRequest({
-			"uri": `https://jjnh6x2hg8.execute-api.us-east-1.amazonaws.com/v1/inventory/${userID.getSteamID64()}/${appID}/${contextID}`,
+			"uri": `https://steamdata1.p.rapidapi.com/inventory/${userID.getSteamID64()}/${appID}/${contextID}`,
 			"qs": {
 				"l": language,
 				"count": 5000,
 				"start_assetid": start
 			},
 			"headers": {
-				"x-api-key": apiKey
+				"X-RapidAPI-Key": apiKey,
+				"X-RapidAPI-Host": "steamdata1.p.rapidapi.com"
 			},
 			"json": true
 		}, function(err, response, body) {
@@ -1047,7 +1048,7 @@ SteamCommunity.prototype.getUserInventoryUltimate = function(apiKey, userID, app
 				}
 
 				if(body && body.error) {
-					callback(new Error(body.error))
+					callback(new Error(body.error || body))
 					return;
 				}
 
