@@ -1030,10 +1030,14 @@ SteamCommunity.prototype.getUserInventoryRapid = function(apiKey, userID, appID,
 			"json": true
 		}, function(err, response, body) {
 			if (err) {
-				if(response.statusCode == 429 && body == null || body && body.error == "Could not retrieve user inventory. Please try again later.") {
-					if(retries > 0) {
-						get(inventory, currency, start, retries - 1)
-						return
+				if (
+					(response.statusCode == 429 && body == null) ||
+					(body && body.info && body.info.includes("took too long to respond")) ||
+					(body && body.error == "Could not retrieve user inventory. Please try again later.")
+				) {
+					if (retries > 0) {
+						get(inventory, currency, start, retries - 1);
+						return;
 					}
 				}
 
