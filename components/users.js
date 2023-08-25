@@ -661,7 +661,7 @@ SteamCommunity.prototype.getInventoryItemsWithDescriptions = function(apiKey, us
 			"json": true
 		}, function(err, response, body) {
 			if (err) {
-				if(response.statusCode == 403) {
+				if(err.message == "HTTP error 403") {
 					callback(new Error("Invalid API key"));
 					return;
 				}
@@ -1031,7 +1031,7 @@ SteamCommunity.prototype.getUserInventoryRapid = function(apiKey, userID, appID,
 		}, function(err, response, body) {
 			if (err) {
 				if (
-					(response.statusCode == 429 && body == null) ||
+					(err.message == "HTTP error 429" && body == null) ||
 					(body && body.info && body.info.includes("took too long to respond")) ||
 					(body && body.error == "Could not retrieve user inventory. Please try again later.")
 				) {
@@ -1046,7 +1046,7 @@ SteamCommunity.prototype.getUserInventoryRapid = function(apiKey, userID, appID,
 					return;
 				}
 
-				if(err.message == "HTTP error 403") {
+				if (err.message == "HTTP error 403" && body === null) {
 					callback(new Error("This profile is private."));
 					return;
 				}
