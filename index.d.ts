@@ -625,6 +625,17 @@ declare namespace SteamCommunity {
          */
         removeFriend(callback?: (err: Error | null) => void): void;
 
+
+        /**
+         * Removes the users from your friends list.
+         *
+         * @param friends - The list of friends to remove.
+         * @param callback - Called when the request completes.
+         *
+         *   - `err` - `null` on success, an `Error` object on failure.
+         */
+        removeFriends(friends: String[] | SteamID[], callback?: (err: Error | null) => void): void;
+
         /**
          * Blocks all communication with the user.
          *
