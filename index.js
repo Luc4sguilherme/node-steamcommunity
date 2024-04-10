@@ -441,6 +441,35 @@ SteamCommunity.prototype.getFriendsList = function(callback) {
 	});
 };
 
+SteamCommunity.prototype.getFriendsLimit = function(callback) {
+	this.httpRequest({
+		uri: "https://steamcommunity.com/profiles/" + this.steamID.toString() + "/friends/",
+	},
+	(err, _response, body) => {
+		if (err) {
+			callback(err);
+		}
+
+		const match = body.match(/var g_cFriendsLimit = (\d+);/);
+
+		if (!match) {
+			callback(new Error("friends limit not found"));
+		}
+
+		const limit = Number(match[1]);
+
+		if (isNaN(limit) || limit < 250) {
+			callback(
+				new Error(
+					"An error occurred while getting the account's friends limit"
+				)
+			);
+		}
+
+		callback(null, limit);
+	}, "steamcommunity");
+}
+
 require('./components/login.js');
 require('./components/http.js');
 require('./components/chat.js');
