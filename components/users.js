@@ -83,6 +83,47 @@ SteamCommunity.prototype.removeFriend = function(userID, callback) {
 	}, "steamcommunity");
 };
 
+SteamCommunity.prototype.removeFriends = function (friends, callback) {
+	if (!Array.isArray(friends)) {
+		throw new Error("The friends must be an array.")
+	}
+
+	friends = friends.map(friend => {
+		if (friend instanceof SteamID) {
+			return friend.getSteamID64();
+		}
+
+		return friend;
+	})
+
+	var self = this;
+	this.httpRequestPost({
+		"uri": "https://steamcommunity.com/profiles/" + self.steamID.getSteamID64() + "/friends/action",
+		"form": {
+			"sessionID": this.getSessionID(),
+			"steamid": self.steamID.getSteamID64(),
+			"action": "remove",
+			"ajax": "1",
+			"steamids[]": friends
+		},
+		"headers": {
+			"Origin": "https://steamcommunity.com",
+			"Referer": "https://steamcommunity.com/profiles/" + self.steamID.getSteamID64() + "/friends/",
+		},
+	}, function (err, response, body) {
+		if (!callback) {
+			return;
+		}
+
+		if (body.success) {
+			callback(null);
+			return;
+		}
+
+		callback(err || null);
+	}, "steamcommunity");
+};
+
 SteamCommunity.prototype.blockCommunication = function(userID, callback) {
 	if(typeof userID === 'string') {
 		userID = new SteamID(userID);
